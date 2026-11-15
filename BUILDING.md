@@ -69,25 +69,25 @@ sudo pacman -S --needed \
 ### Option 1: Using the build script
 
 ```bash
-chmod +x build_linux.sh
-./build_linux.sh
+bash TatouSource/build_linux.sh
 ```
 
 ### Option 2: Manual CMake build
 
 ```bash
-# Create build directory
-mkdir -p build/linux
-cd build/linux
-
-# Configure
-cmake ../.. -DCMAKE_BUILD_TYPE=Release
+# Configure from the repository root
+cmake -S TatouSource -B build/linux -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DFITD_EXTERNAL_DATA=ON \
+    -DSDL_WAYLAND=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DBGFX_BUILD_TESTS=OFF
 
 # Build (use -j for parallel compilation)
-cmake --build . --config Release -j$(nproc)
+cmake --build build/linux --target Fitd -j$(nproc)
 ```
 
 The executable will be at: `build/linux/Fitd/Tatou`
+
+The build script uses `TatouSource/build/linux/Fitd/` instead. Linux builds use
+external game data and X11/XWayland, including under Steam Game Mode.
 
 ## Running
 
@@ -96,7 +96,7 @@ The executable will be at: `build/linux/Fitd/Tatou`
 Copy `launch_tatou.sh` to the same directory as the `Tatou` binary:
 
 ```bash
-cp launch_tatou.sh build/linux/Fitd/
+cp TatouSource/launch_tatou.sh build/linux/Fitd/
 cd build/linux/Fitd
 chmod +x launch_tatou.sh
 ./launch_tatou.sh
@@ -118,6 +118,12 @@ The game requires the original Alone In The Dark data files. Place these in the 
 - `atlases/` directory (HD texture atlases)
 - `backgrounds_hd/` directory (HD backgrounds)
 - `audio.hda` (audio archive)
+
+With `FITD_EXTERNAL_DATA=ON`, also copy the original `*.ITD` files and the public
+2.5 release's `atlases.hda`, `backgrounds_hd.hda` and `BLKCHCRY.TTF` beside `Tatou`.
+For a standalone copy, set `gamedata.steamless = true` in `aitd_remaster.cfg`.
+The launcher selects X11 and disables optional injected graphics layers for this
+game only; its latest output is written to `logs/rehaunted.log`.
 
 ## Troubleshooting
 

@@ -44,9 +44,16 @@ cd "$BUILD_DIR"
 
 cmake "$SCRIPT_DIR" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    -DFITD_EXTERNAL_DATA=ON \
+    -DSDL_WAYLAND=OFF \
+    -DSDL_TESTS=OFF \
+    -DSDL_EXAMPLES=OFF \
+    -DBGFX_BUILD_TESTS=OFF \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-cmake --build . --parallel "$(nproc)"
+cmake --build . --target Fitd --parallel "$(nproc)"
+cp "$SCRIPT_DIR/launch_tatou.sh" "$BUILD_DIR/Fitd/"
 
 echo ""
 echo "=== Build complete ==="
