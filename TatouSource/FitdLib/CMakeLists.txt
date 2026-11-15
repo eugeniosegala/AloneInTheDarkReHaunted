@@ -48,6 +48,12 @@ file(GLOB_RECURSE SRC_ROOT
     "*.h"
 )
 
+option(FITD_EXTERNAL_DATA "Use original game files beside the executable" OFF)
+if(FITD_EXTERNAL_DATA)
+    list(FILTER SRC_ROOT EXCLUDE REGEX "/embedded/.*[.]cpp$")
+else()
+    list(REMOVE_ITEM SRC_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/externalData.cpp")
+endif()
 
 
 # Base source files

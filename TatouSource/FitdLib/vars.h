@@ -411,6 +411,8 @@ extern float g_shadowLightDirY;
 extern float g_shadowLightDirZ;
 extern bool g_submitShadowStencil;
 extern int g_portraitOverlayChoice;
+// Character selection has its own highlight; portrait overlays are intro pages.
+extern int g_characterSelectionChoice;
 extern bool g_roomIsDark;
 
 extern char currentCameraVisibilityList[30];

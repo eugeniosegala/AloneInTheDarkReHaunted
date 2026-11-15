@@ -107,12 +107,19 @@ inline bool menuMouseMoved(ImVec2& lastPos, bool hasInput)
         return false;
     }
 
+    // Consume cursor motion while keys or a controller own menu navigation.
+    // Otherwise that old movement overrides the choice when the button lifts.
+    if (hasInput)
+    {
+        lastPos = cur;
+        return false;
+    }
+
     float dx = cur.x - lastPos.x;
     float dy = cur.y - lastPos.y;
     bool moved = !hasInput && (dx * dx + dy * dy) >= (MOUSE_MOVE_THRESHOLD * MOUSE_MOVE_THRESHOLD);
     if (moved)
         lastPos = cur;
-    if (hasInput) moved = false;
     return moved;
 }
 

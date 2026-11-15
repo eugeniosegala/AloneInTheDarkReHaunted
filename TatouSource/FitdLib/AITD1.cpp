@@ -236,40 +236,23 @@ void CopyBox_Aux_Log(int x1, int y1, int x2, int y2)
     }
 }
 
-// Helper function to copy frame border (excluding portrait regions) to UI layer for HD backgrounds
-static void CopyFrameBorderToUILayer()
+static bool loadCharacterSelectionHDBackground()
 {
-    // Both character portrait regions are excluded so HD background shows through.
-    // Left portrait:  x [10..149),  y [10..190)
-    // Right portrait: x [170..309), y [10..190)
-    // We split the scan into three vertical bands to avoid per-pixel branching.
-    auto copyRowSpan = [](int y, int x1, int x2)
-    {
-        const unsigned char* src = (const unsigned char*)&logicalScreen[y * 320 + x1];
-        unsigned char* dst = &uiLayer[y * 320 + x1];
-        for (int j = x1; j < x2; ++j, ++src, ++dst)
-        {
-            unsigned char pixel = *src;
-            if (pixel != 0)
-                *dst = pixel;
-        }
-    };
+    setCurrentAnimatedHDBackground(nullptr);
+    if (!g_remasterConfig.graphics.enableHDBackgrounds)
+        return false;
 
-    // Top band: full width, rows [0..10)
-    for (int i = 0; i < 10; ++i)
-        copyRowSpan(i, 0, 320);
+    HDBackgroundInfo* background = loadHDBackground("ITD_RESS", 10);
+    if (!background)
+        return false;
 
-    // Middle band: rows [10..190) - skip the two portrait interiors
-    for (int i = 10; i < 190; ++i)
-    {
-        copyRowSpan(i, 0, 10);     // left of left portrait
-        copyRowSpan(i, 149, 170);  // gap between portraits
-        copyRowSpan(i, 309, 320);  // right of right portrait
-    }
-
-    // Bottom band: full width, rows [190..200)
-    for (int i = 190; i < 200; ++i)
-        copyRowSpan(i, 0, 320);
+    updateBackgroundTextureHD(background->data, background->width,
+                              background->height, background->channels);
+    if (background->isAnimated)
+        setCurrentAnimatedHDBackground(background);
+    else
+        freeHDBackground(background);
+    return true;
 }
 
 int ChoosePerso(void)
@@ -281,24 +264,13 @@ int ChoosePerso(void)
     // Notify TTF that we're entering character selection
     notifyTTFMenuStateChanged(true, false);
 
-    // Try HD replacement for character selection background (only in HD mode)
-    HDBackgroundInfo* hdBg = g_remasterConfig.graphics.enableHDBackgrounds ? loadHDBackground("ITD_RESS", 10) : nullptr;
-    if (hdBg)
-    {
-        updateBackgroundTextureHD(hdBg->data, hdBg->width, hdBg->height, hdBg->channels);
-        if (hdBg->isAnimated)
-            setCurrentAnimatedHDBackground(hdBg);
-        else
-            freeHDBackground(hdBg);
-    }
-
-    // Store whether we're using HD background for this screen
-    bool usingHDBackground = g_currentBackgroundIsHD;
+    const bool usingHDBackground = loadCharacterSelectionHDBackground();
 
     uiLayer.fill(0);
     InitCopyBox(aux, logicalScreen);
 
-    g_portraitOverlayChoice = choice;
+    g_portraitOverlayChoice = -1;
+    g_characterSelectionChoice = choice;
 
     // Load the character-select PAK once and snapshot a clean copy in aux2.
     // Both are used many times by the inner loop without changing.
@@ -307,6 +279,7 @@ int ChoosePerso(void)
 
     while (choiceMade == 0)
     {
+        g_characterSelectionChoice = choice;
         process_events();
         osystem_drawBackground();
 
@@ -328,11 +301,10 @@ int ChoosePerso(void)
             CopyBox_Aux_Log(170, 10, 309, 190);
         }
 
-        // When using HD backgrounds, copy only the selection frame border to the UI layer
-        // (exclude BOTH character portrait areas so HD background shows through for both)
+        // The HD artwork supplies both frames; keep the paletted DOS UI empty.
         if (usingHDBackground)
         {
-            CopyFrameBorderToUILayer();
+            uiLayer.fill(0);
         }
 
         FastCopyScreen(logicalScreen, frontBuffer);
@@ -363,66 +335,56 @@ int ChoosePerso(void)
             process_events();
             osystem_drawBackground();
 
-            if (JoyD & 4) // left
+            if ((JoyD & 4) && choice != 0) // left
             {
                 choice = 0;
-                g_portraitOverlayChoice = 0;
+                g_characterSelectionChoice = 0;
                 FastCopyScreen(aux2, logicalScreen);
                 AffBigCadre(80, 100, 160, 200);
                 CopyBox_Aux_Log(10, 10, 149, 190);
 
-                // When using HD backgrounds, copy only the frame border to UI layer
+                // HD selection highlighting is drawn separately from the DOS UI.
                 if (usingHDBackground)
                 {
                     uiLayer.fill(0);
-                    CopyFrameBorderToUILayer();
                 }
 
                 osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
                 notifyTTFMenuSelectionChanged();
 
-                while (JoyD != 0)
-                {
-                    process_events();
-                }
             }
 
-            if (JoyD & 8) // right
+            if ((JoyD & 8) && choice != 1) // right
             {
                 choice = 1;
-                g_portraitOverlayChoice = 1;
+                g_characterSelectionChoice = 1;
                 FastCopyScreen(aux2, logicalScreen);
                 AffBigCadre(240, 100, 160, 200);
                 CopyBox_Aux_Log(170, 10, 309, 190);
 
-                // When using HD backgrounds, copy only the frame border to UI layer
+                // HD selection highlighting is drawn separately from the DOS UI.
                 if (usingHDBackground)
                 {
                     uiLayer.fill(0);
-                    CopyFrameBorderToUILayer();
                 }
 
                 osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
                 notifyTTFMenuSelectionChanged();
 
-                while (JoyD != 0)
-                {
-                    process_events();
-                }
             }
 
             // Mouse: hovering/clicking on a portrait selects or confirms
             {
                 static ImVec2 s_chooseMouse = { -1.0f, -1.0f };
                 ImVec2 gm = menuGetGameMouse();
-                bool anyKey = (JoyD != 0);
+                bool anyKey = (key || JoyD || Click);
                 if (menuMouseMoved(s_chooseMouse, anyKey) && gm.x >= 0.0f)
                 {
                     int newChoice = (gm.x < 160.0f) ? 0 : 1;
                     if (newChoice != choice)
                     {
                         choice = newChoice;
-                        g_portraitOverlayChoice = choice;
+                        g_characterSelectionChoice = choice;
                         FastCopyScreen(aux2, logicalScreen);
                         if (choice == 0)
                         {
@@ -434,7 +396,7 @@ int ChoosePerso(void)
                             AffBigCadre(240, 100, 160, 200);
                             CopyBox_Aux_Log(170, 10, 309, 190);
                         }
-                        if (usingHDBackground) { uiLayer.fill(0); CopyFrameBorderToUILayer(); }
+                        if (usingHDBackground) { uiLayer.fill(0); }
                         osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
                         notifyTTFMenuSelectionChanged();
                     }
@@ -442,7 +404,7 @@ int ChoosePerso(void)
                 if (menuMouseClicked() && gm.x >= 0.0f)
                 {
                     choice = (gm.x < 160.0f) ? 0 : 1;
-                    g_portraitOverlayChoice = choice;
+                    g_characterSelectionChoice = choice;
                     localKey = 0x1C; // treat as Enter to exit inner loop
                 }
             }
@@ -452,6 +414,7 @@ int ChoosePerso(void)
                 // Clear UI layer and reset HD background when leaving via escape
                 setCurrentAnimatedHDBackground(nullptr);
                 uiLayer.fill(0);
+                g_characterSelectionChoice = -1;
                 g_portraitOverlayChoice = -1;
                 notifyTTFMenuStateChanged(false, false);
                 if (g_currentBackgroundIsHD)
@@ -464,6 +427,7 @@ int ChoosePerso(void)
             }
         }
 
+        g_characterSelectionChoice = -1;
         FadeOutPhys(0x40, 0);
         turnPageFlag = 0;
 
@@ -551,16 +515,28 @@ int ChoosePerso(void)
             }
         }
 
+        const int introExitKey = localKey;
+        // Do not let the same Back/Confirm press also dismiss the next screen.
+        while (key || Click || JoyD)
+            process_events();
+        notifyTTFMenuSelectionChanged();
         g_portraitOverlayChoice = -1;
+        uiLayer.fill(0);
 
-        if (localKey == 0x1C)
+        if (introExitKey == 0x1C)
         {
             choiceMade = 1;
+        }
+        else if (usingHDBackground)
+        {
+            // The reading page replaces the HD texture; restore both portraits.
+            loadCharacterSelectionHDBackground();
         }
 
     }
 
     // Clear UI layer and reset HD background when leaving character selection
+    g_characterSelectionChoice = -1;
     setCurrentAnimatedHDBackground(nullptr);
     uiLayer.fill(0);
     g_portraitOverlayChoice = -1;

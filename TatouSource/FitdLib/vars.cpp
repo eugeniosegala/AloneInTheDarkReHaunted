@@ -26,6 +26,7 @@ float g_shadowLightDirY = -1.0f;
 float g_shadowLightDirZ = 0.2f;
 bool g_submitShadowStencil = false;
 int g_portraitOverlayChoice = -1;
+int g_characterSelectionChoice = -1;
 bool g_roomIsDark = false;
 
 char* aux;

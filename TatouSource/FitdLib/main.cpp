@@ -760,11 +760,14 @@ void loadPalette(void)
 
 void turnPageForward()
 {
-    // Force SD background path during animation - our composited data
-    // is uploaded to g_backgroundTexture (paletted R8U), but when HD
-    // backgrounds are active the renderer draws g_hdBackgroundTexture instead.
-    bool savedHD = g_currentBackgroundIsHD;
-    g_currentBackgroundIsHD = false;
+    // The legacy animation contains only paletted 320x200 pixels, not the HD
+    // artwork or TTF text. Keep HD pages in their renderer instead of flashing
+    // the old artwork between pages; retain the animation for SD books.
+    if (g_currentBackgroundIsHD)
+    {
+        osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
+        return;
+    }
 
     osystem_pageTurnCapture();
     osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
@@ -778,13 +781,15 @@ void turnPageForward()
     }
 
     osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
-    g_currentBackgroundIsHD = savedHD;
 }
 
 void turnPageBackward()
 {
-    bool savedHD = g_currentBackgroundIsHD;
-    g_currentBackgroundIsHD = false;
+    if (g_currentBackgroundIsHD)
+    {
+        osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
+        return;
+    }
 
     osystem_pageTurnCapture();
     osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
@@ -798,7 +803,6 @@ void turnPageBackward()
     }
 
     osystem_CopyBlockPhys((unsigned char*)logicalScreen, 0, 0, 320, 200);
-    g_currentBackgroundIsHD = savedHD;
 }
 
 void readBook(int index, int type, int vocIndex)
@@ -1206,7 +1210,7 @@ int Lire(int index, int startx, int top, int endx, int bottom, int demoMode, int
                     }
                 }
 
-                if ((localKey == 1) || localClick)
+                if (localKey == 0x1B || localKey == 1 || localClick)
                 {
                     quit = 1;
                     break;
@@ -5526,10 +5530,13 @@ int FitdMain(int argc, char* argv[])
     // menus are initialized. The main SDL thread continues pumping events and
     // bgfx frames, but game boot is gated until the dialog is dismissed.
     if (g_remasterConfig.ui.showOptionsAtStartup)
-    {// Hide the console window at startup; it will be shown after the main window is created
+    {
+#ifdef _WIN32
+        // The Windows console must not cover the startup settings dialog.
         HWND hConsole = GetConsoleWindow();
         if (hConsole)
             ShowWindow(hConsole, SW_HIDE);
+#endif
         remasterOptionsBeginStartupGate();
         do
         {

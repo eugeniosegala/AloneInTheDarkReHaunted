@@ -2435,6 +2435,30 @@ void renderGameWindow()
     ImGui::End();
 }
 
+static void drawCharacterSelectionHighlight()
+{
+    if (g_characterSelectionChoice < 0 || g_characterSelectionChoice > 1 ||
+        !g_currentBackgroundIsHD)
+        return;
+
+    // The HD selection artwork already contains both framed portraits. Draw a
+    // stable outline instead of compositing a full-screen intro page or DOS UI.
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImVec2 scale(viewport->Size.x / 320.0f, viewport->Size.y / 200.0f);
+    const float left = g_characterSelectionChoice == 0 ? 3.0f : 163.0f;
+    const ImVec2 topLeft(viewport->Pos.x + left * scale.x,
+                        viewport->Pos.y + 3.0f * scale.y);
+    const ImVec2 bottomRight(topLeft.x + 154.0f * scale.x,
+                            viewport->Pos.y + 197.0f * scale.y);
+    const float thickness = std::max(2.0f, viewport->Size.y / 400.0f);
+    const int alpha = static_cast<int>(255.0f * std::clamp(g_fadeLevel, 0.0f, 1.0f));
+    ImDrawList* drawList = ImGui::GetForegroundDrawList();
+    drawList->AddRect(topLeft, bottomRight, IM_COL32(25, 15, 5, alpha),
+                      0.0f, 0, thickness * 2.0f);
+    drawList->AddRect(topLeft, bottomRight, IM_COL32(255, 232, 164, alpha),
+                      0.0f, 0, thickness);
+}
+
 void osystem_startFrame()
 {
     if (!g_bgfxMainResourcesInitialized)
@@ -2533,6 +2557,7 @@ void osystem_startFrame()
     {
         osystem_drawPortraitOverlay(g_portraitOverlayChoice);
     }
+    drawCharacterSelectionHighlight();
 }
 
 unsigned char frontBuffer[320 * 200];
