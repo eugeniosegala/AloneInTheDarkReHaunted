@@ -418,7 +418,7 @@ static void wakeUpStuckActor(tObject* actor)
 
     // Clear pathfinding stuck counters - these can disable active chase
     // after too many failed waypoint-approach frames.
-    resetTrackStuckCounters(actor->indexInWorld);
+    resetTrackStuckCounters(static_cast<int>(actor - ListObjets.data()));
 }
 
 static bool patchCondition_EnemyStuckAtWindow(int lifeNum, int opcode, tObject* actor)
@@ -474,7 +474,7 @@ static void patchAction_EnemyStuckAtWindow(int lifeNum, int opcode, tObject* act
     if (s_zombieChickenPostCrashTime.count(actorIdx) == 0)
     {
         s_zombieChickenPostCrashTime[actorIdx] = now;
-        s_zombieChickenLastY[actorIdx] = actor->worldY;
+        s_zombieChickenLastY[actorIdx] = actor->worldY + actor->stepY;
         s_zombieChickenLastYChangeTime[actorIdx] = now;
         printf(LIFE_TAG "Bytecode patch: Zombie chicken actor %d now post-crash - starting grace period" CON_RESET "\n", actorIdx);
         return;
@@ -484,9 +484,9 @@ static void patchAction_EnemyStuckAtWindow(int lifeNum, int opcode, tObject* act
     // last observation it is still falling / jumping; refresh the timestamp.
     {
         auto lastYIt = s_zombieChickenLastY.find(actorIdx);
-        if (lastYIt != s_zombieChickenLastY.end() && lastYIt->second != actor->worldY)
+        if (lastYIt != s_zombieChickenLastY.end() && lastYIt->second != actor->worldY + actor->stepY)
         {
-            lastYIt->second = actor->worldY;
+            lastYIt->second = actor->worldY + actor->stepY;
             s_zombieChickenLastYChangeTime[actorIdx] = now;
         }
     }
@@ -509,6 +509,26 @@ static void patchAction_EnemyStuckAtWindow(int lifeNum, int opcode, tObject* act
     // Check if we're still tracking this actor as stuck
     bool hasStuckRecord = (s_zombieChickenStuckTime.count(actorIdx) > 0);
 
+    // Animation movement accumulates in stepX/Y/Z until a keyframe ends.
+    // Real progress means recovery is over; do not force chase/animation state
+    // on an enemy that is already moving normally.
+    if (hasStuckRecord)
+    {
+        const auto position = s_zombieChickenLastPosition.find(actorIdx);
+        if (position != s_zombieChickenLastPosition.end())
+        {
+            const long long dx = actor->worldX + actor->stepX - position->second.x;
+            const long long dz = actor->worldZ + actor->stepZ - position->second.z;
+            if (dx * dx + dz * dz >= 100)
+            {
+                s_zombieChickenStuckCount.erase(actorIdx);
+                s_zombieChickenStuckTime.erase(actorIdx);
+                s_zombieChickenLastPosition.erase(actorIdx);
+                return;
+            }
+        }
+    }
+
     // Only detect stuck AFTER normal behavior has been attempted
     // Detect stuck condition: zombie chicken with zero speed but active trackmode
     if (actor->speed == 0 && actor->ANIM >= 0)
@@ -518,7 +538,7 @@ static void patchAction_EnemyStuckAtWindow(int lifeNum, int opcode, tObject* act
         {
             s_zombieChickenStuckCount[actorIdx] = 1;
             s_zombieChickenStuckTime[actorIdx] = now;
-            s_zombieChickenLastPosition[actorIdx] = {actor->worldX, actor->worldY, actor->worldZ};
+            s_zombieChickenLastPosition[actorIdx] = {actor->worldX + actor->stepX, actor->worldY + actor->stepY, actor->worldZ + actor->stepZ};
             printf(LIFE_TAG "Bytecode patch: Zombie chicken stuck detected (post-crash) in life %d, actor %d, body %d - waiting 10 seconds before intervention..." CON_RESET "\n",
                    lifeNum, actorIdx, actor->bodyNum);
             return;  // Just record, don't intervene yet
@@ -599,7 +619,7 @@ static void patchAction_EnemyStuckAtWindow(int lifeNum, int opcode, tObject* act
                     // Re-baseline position and timer so we keep validating
                     // that the chicken is continuing to move. If it stalls
                     // again we'll re-trigger the full unstick path.
-                    s_zombieChickenLastPosition[actorIdx] = {actor->worldX, actor->worldY, actor->worldZ};
+                    s_zombieChickenLastPosition[actorIdx] = {actor->worldX + actor->stepX, actor->worldY + actor->stepY, actor->worldZ + actor->stepZ};
                     s_zombieChickenStuckTime[actorIdx] = now;
                 }
                 else

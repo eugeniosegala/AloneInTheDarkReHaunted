@@ -10,6 +10,7 @@
 #include "common.h"
 #include "consoleLog.h"
 #include "math.h"
+#include "trackCollision.h"
 
 #define	TL_INIT_COOR		0
 #define	TL_GOTO			1
@@ -234,6 +235,35 @@ char* getRoomLink(unsigned int room1, unsigned int room2)
     return bestZone;
 }
 
+// Before a track restores wall collision, its final GOTO must clear the
+// receiver's entire collision volume, not just put its centre within 400 units.
+static bool prepareCollisionExitWaypoint(const char* nextMacro, int& x, int& z)
+{
+    const tObject& actor = *currentProcessedActorPtr;
+    if ((actor.dynFlags & 1) || convertTrackMacro(READ_LE_S16((void*)nextMacro)) != TL_COL_ON ||
+        actor.room < 0 || actor.room >= int(roomDataTable.size()))
+        return false;
+    std::vector<trackCollision::Box> solids;
+    for (const auto& entry : roomDataTable[actor.room].hardColTable)
+    {
+        if (entry.type != 0 && entry.type != 1) continue;
+        const auto& b = entry.zv;
+        solids.push_back({b.ZVX1, b.ZVX2, b.ZVY1, b.ZVY2, b.ZVZ1, b.ZVZ2});
+    }
+    const auto& b = actor.zv;
+    const trackCollision::Box current{b.ZVX1, b.ZVX2, b.ZVY1, b.ZVY2, b.ZVZ1, b.ZVZ2};
+    const auto goal = trackCollision::translated(current, x - actor.roomX - actor.stepX,
+                                                z - actor.roomZ - actor.stepZ);
+    const int maxShift = std::max(b.ZVX2 - b.ZVX1, b.ZVZ2 - b.ZVZ1) + DISTANCE_TO_POINT_TRESSHOLD;
+    int offsetX = 0, offsetZ = 0;
+    if (!trackCollision::findClearExit(goal, solids, maxShift, offsetX, offsetZ))
+        return false;
+    x += offsetX; z += offsetZ;
+    return std::any_of(solids.begin(), solids.end(), [&](const trackCollision::Box& solid) {
+        return trackCollision::overlaps(current, solid);
+    });
+}
+
 void processTrack(void)
 {
     switch(currentProcessedActorPtr->trackMode)
@@ -434,12 +464,14 @@ void processTrack(void)
                         z += (roomDataTable[currentProcessedActorPtr->room].worldZ - roomDataTable[roomNumber].worldZ) * 10;
                     }
 
+                    const bool needsClearance = prepareCollisionExitWaypoint(trackPtr, x, z);
+
                     distanceToPoint = GiveDistance2D( currentProcessedActorPtr->roomX + currentProcessedActorPtr->stepX,
                         currentProcessedActorPtr->roomZ + currentProcessedActorPtr->stepZ,
                         x,z );
 
 
-                    if(distanceToPoint >= DISTANCE_TO_POINT_TRESSHOLD) // not yet at position
+                    if(distanceToPoint >= DISTANCE_TO_POINT_TRESSHOLD || needsClearance) // not yet at a safe position
                     {
                         // Stuck detection: if the actor hasn't gotten closer to the
                         // waypoint for GOTO_STUCK_FRAME_LIMIT frames (e.g. blocked
