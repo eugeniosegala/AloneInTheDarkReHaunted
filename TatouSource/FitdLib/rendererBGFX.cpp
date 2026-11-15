@@ -2750,6 +2750,9 @@ void osystem_flushPendingPrimitives()
             bgfx::setStencil(BGFX_STENCIL_TEST_EQUAL
                 | BGFX_STENCIL_FUNC_REF(0)
                 | BGFX_STENCIL_FUNC_RMASK(0xFF)
+                // Preserve both scenery occlusion and previous shadow coverage
+                // when stencil rejects a triangle (the default op is ZERO).
+                | BGFX_STENCIL_OP_FAIL_S_KEEP
                 | BGFX_STENCIL_OP_FAIL_Z_KEEP
                 | BGFX_STENCIL_OP_PASS_Z_INCR);
         }
@@ -3037,6 +3040,9 @@ void osystem_flushPendingPrimitives()
             bgfx::setStencil(BGFX_STENCIL_TEST_EQUAL
                 | BGFX_STENCIL_FUNC_REF(0)
                 | BGFX_STENCIL_FUNC_RMASK(0xFF)
+                // Preserve both scenery occlusion and previous shadow coverage
+                // when stencil rejects a triangle (the default op is ZERO).
+                | BGFX_STENCIL_OP_FAIL_S_KEEP
                 | BGFX_STENCIL_OP_FAIL_Z_KEEP
                 | BGFX_STENCIL_OP_PASS_Z_INCR);
         }
