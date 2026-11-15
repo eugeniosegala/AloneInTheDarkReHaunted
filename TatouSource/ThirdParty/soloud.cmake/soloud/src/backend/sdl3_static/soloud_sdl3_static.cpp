@@ -41,6 +41,8 @@ namespace SoLoud
 #include "SDL.h"
 #include <math.h>
 
+// Local SDL3 fix: mix in the application's stream format, leaving conversion
+// to the hardware format to SDL. The stream owns its playback device.
 namespace SoLoud
 {
     static SoLoudBackendDataSdl3 gBackendData{};
@@ -82,7 +84,8 @@ namespace SoLoud
 
 	static void soloud_sdl3static_deinit(SoLoud::Soloud *aSoloud)
 	{
-		SDL_CloseAudioDevice(gBackendData.audioDeviceId);
+		SDL_DestroyAudioStream(gBackendData.audioStream);
+        gBackendData = {};
 	}
 
 	result sdl3static_init(SoLoud::Soloud *aSoloud, unsigned int aFlags, unsigned int aSamplerate, unsigned int aBuffer, unsigned int aChannels, void const* clientData)
@@ -139,11 +142,18 @@ namespace SoLoud
             }
         }
 
-        SDL_GetAudioDeviceFormat(
-            gBackendData.audioDeviceId,
+        // The callback feeds the stream's input, not the physical device.
+        // A device may use S16/48 kHz or surround while this input is F32/stereo.
+        if (!SDL_GetAudioStreamFormat(
+            gBackendData.audioStream,
             &gBackendData.activeAudioSpec,
             NULL
-        );
+        ))
+        {
+            SDL_DestroyAudioStream(gBackendData.audioStream);
+            gBackendData = {};
+            return UNKNOWN_ERROR;
+        }
 
         aSoloud->postinit_internal(
             gBackendData.activeAudioSpec.freq,
@@ -156,7 +166,7 @@ namespace SoLoud
 
         //SDL_PauseAudioStreamDevice(gBackendData.audioStream);
         aSoloud->mBackendData = &gBackendData;
-        aSoloud->mBackendString = "SDL3 (dynamic)";
+        aSoloud->mBackendString = "SDL3 (static)";
 
         SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(gBackendData.audioStream));
 

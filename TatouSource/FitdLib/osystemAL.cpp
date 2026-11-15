@@ -455,7 +455,16 @@ void osystem_stopTrack()
 void osystemAL_init()
 {
     gSoloud = new SoLoud::Soloud();
-    gSoloud->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::AUTO, SoLoud::Soloud::AUTO, SoLoud::Soloud::AUTO, 2);
+    SoLoud::result result = gSoloud->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::AUTO, SoLoud::Soloud::AUTO, SoLoud::Soloud::AUTO, 2);
+    if (result != SoLoud::SO_NO_ERROR)
+    {
+        fprintf(stderr, "[AUDIO] Initialization failed: %s\n", gSoloud->getErrorString(result));
+        delete gSoloud;
+        gSoloud = nullptr;
+        return;
+    }
+    printf("[AUDIO] %s: %u Hz, %u channels\n", gSoloud->getBackendString(),
+           gSoloud->getBackendSamplerate(), gSoloud->getBackendChannels());
 }
 
 void osystemAL_deinit()
