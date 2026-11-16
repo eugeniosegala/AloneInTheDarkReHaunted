@@ -18,3 +18,18 @@ bool getEmbeddedJackFile(const char* name, const unsigned char** data, size_t* s
 {
     return getEmbeddedFile(name, data, size);
 }
+
+bool getEmbeddedAitd2File(const char* name, const unsigned char** data, size_t* size)
+{
+    return getEmbeddedFile(name, data, size);
+}
+
+bool getEmbeddedAitd3File(const char* name, const unsigned char** data, size_t* size)
+{
+    return getEmbeddedFile(name, data, size);
+}
+
+bool preferEmbeddedGameData()
+{
+    return false;
+}

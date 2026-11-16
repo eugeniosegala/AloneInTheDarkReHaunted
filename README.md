@@ -7,12 +7,15 @@
 *Copyright © 2026 Infogrames / Spacefarer Retro Remasters LLC*
 *Author: Jake Jackson (jake@spacefarergames.com)*
 
+**Now updated for Unity Engine, supports Windows, Linux, macOS, Android and more devices coming soon.**
+
 **A cross-platform engine reimplementation for the classic *Alone in the Dark* trilogy (1992–1995), with modern remaster enhancements.**
 
-OS supported with binaries - Windows (64bit) Linux (64bit) macOS 11.3 (64bit)
+OS supported with binaries - Windows (64bit) Linux (64bit) macOS 11.3 (64bit) Android (ARM64bit 3.x Unity versions) Switch and UWP (3.x Unity versions)
 
-> This fork tracks public release **2.5.0.0110**, with fixes for Linux character menus,
-> HD book pages, audio conversion, shadow masking and window-entry enemy movement. See [BUILDING.md](BUILDING.md).
+> `stable-linux` builds the native **2.5 C++ engine**, synchronized with `main` and
+> retaining our Linux menu, HD page, audio, shadow and enemy fixes. Unity 3.0 sources
+> are separate from this native build. See [BUILDING.md](BUILDING.md).
 
 AITD-R (also known as *Alone In The Dark Re-Haunted*) lets you play the original *Alone in the Dark* games on modern hardware. It is a from-scratch C++ reimplementation of the Infogrames engine, built with modern rendering (bgfx), audio (SoLoud), and input (SDL3) backends. The project is released under the **GNU General Public License v2**.
 
